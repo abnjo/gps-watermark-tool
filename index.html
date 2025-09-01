@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Watermark Generator</title>
+    <!-- External Libraries -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/open-location-code@2.0.0/openlocationcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<<<<<<< HEAD
+=======
+    
+    <!-- MODIFICATION: Load the templates data from the JS file -->
+    <script src="templates.js"></script>
+
+>>>>>>> e693941 (updated the html to use js)
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5; color: #1c1e21; margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .container { display: flex; flex-wrap: wrap; gap: 30px; width: 100%; max-width: 1200px; justify-content: center; }
+        .controls, .preview { background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); padding: 20px; }
+        .controls { width: 100%; max-width: 400px; }
+        .preview { flex-grow: 1; text-align: center; }
+        h1, h2 { text-align: center; color: #333; }
+        h2 { margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 20px; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #606770; }
+        .input-group input, .input-group textarea {
+            width: 100%; padding: 8px; border: 1px solid #dddfe2; border-radius: 6px;
+            box-sizing: border-box; font-family: inherit;
+        }
+        .input-pair { display: flex; gap: 10px; align-items: center; }
+        button, input[type="file"]::file-selector-button {
+            width: 100%; padding: 10px 15px; border-radius: 6px; border: none; background-color: #1877f2;
+            color: white; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background-color 0.2s;
+        }
+        button:hover, input[type="file"]::file-selector-button:hover { background-color: #166fe5; }
+        button:disabled { background-color: #a0bdf5; cursor: not-allowed; }
+        #previewCanvas { max-width: 100%; height: auto; border: 1px solid #dddfe2; border-radius: 6px; }
+        #map { height: 250px; width: 100%; border-radius: 6px; margin-bottom: 15px; background-color: #e0e0e0; }
+        .template-buttons button, #retryThumbnailBtn {
+            background-color: #e4e6eb; color: #1c1e21; margin-top: 5px; font-size: 14px;
+        }
+        .template-buttons button:hover, #retryThumbnailBtn:hover { background-color: #d8dade; }
+        .preview-controls { margin-top: 10px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <h1>Image Watermark Generator</h1>
+
+    <div class="container">
+        <div class="controls">
+            <h2>Configuration</h2>
+            <div class="input-group"><label for="imageLoader">1. Choose Photo</label><input type="file" id="imageLoader" accept="image/*"></div>
+
+            <fieldset id="config-fieldset" disabled>
+                <legend>2. Configure Watermark</legend>
+                <div class="input-group"><label>Quick Presets</label><div id="template-buttons" class="template-buttons"></div></div>
+                <div class="input-group"><label for="locationName">Location Name (Primary Title)</label><input type="text" id="locationName" placeholder="e.g., Main Construction Site"></div>
+                <div class="input-group">
+                    <label>Choose Location on Map</label>
+                    <div class="input-pair">
+                        <input type="text" id="mapSearch" placeholder="Search for a place..."><button type="button" id="searchBtn" style="width: auto; margin-top: 0;">Search</button>
+                    </div>
+                    <button type="button" id="locateBtn">Use My Current Location</button>
+                    <div id="map"></div>
+                    <div class="input-pair">
+                        <input type="number" step="any" id="latitude" placeholder="Latitude"><input type="number" step="any" id="longitude" placeholder="Longitude">
+                        <button type="button" id="coordGoBtn" style="width: auto; margin-top: 0; padding: 8px 12px; font-size: 14px;">Go</button>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="plusCode">Plus Code</label>
+                    <div class="input-pair">
+                        <input type="text" id="plusCode" placeholder="Auto-generates or enter a code">
+                        <button type="button" id="plusCodeGoBtn" style="width: auto; margin-top: 0; padding: 8px 12px; font-size: 14px;">Go</button>
+                    </div>
+                </div>
+                <div class="input-group"><label for="locationDetails">Location Details (Auto-Generated)</label><textarea id="locationDetails" rows="3" placeholder="Auto-generated from map"></textarea></div>
+                <div class="input-group"><label>Date & Time</label><div class="input-pair"><input type="date" id="date"><input type="time" id="time" step="1"></div></div>
+                <div class="input-group"><label for="timezone">Timezone</label><input type="text" id="timezone" placeholder="e.g., GMT +05:30"></div>
+            </fieldset>
+
+            <button id="downloadBtn" disabled>3. Download Image</button>
+        </div>
+
+        <div class="preview">
+            <h2>Live Preview</h2>
+            <canvas id="previewCanvas"></canvas>
+            <div class="preview-controls"><button id="retryThumbnailBtn" disabled>Generate/Retry Thumbnail</button></div>
+        </div>
+    </div>
+
+    <script>
+        const allInputs = {
+            imageLoader: document.getElementById('imageLoader'), canvas: document.getElementById('previewCanvas'),
+            downloadBtn: document.getElementById('downloadBtn'), configFieldset: document.getElementById('config-fieldset'),
+            locationName: document.getElementById('locationName'), latitude: document.getElementById('latitude'),
+            longitude: document.getElementById('longitude'), plusCode: document.getElementById('plusCode'),
+            locationDetails: document.getElementById('locationDetails'), date: document.getElementById('date'),
+            time: document.getElementById('time'), timezone: document.getElementById('timezone'),
+            locateBtn: document.getElementById('locateBtn'), searchBtn: document.getElementById('searchBtn'),
+            mapSearch: document.getElementById('mapSearch'), retryThumbnailBtn: document.getElementById('retryThumbnailBtn'),
+            templateButtons: document.getElementById('template-buttons'),
+            coordGoBtn: document.getElementById('coordGoBtn'), plusCodeGoBtn: document.getElementById('plusCodeGoBtn'),
+        };
+        const ctx = allInputs.canvas.getContext('2d');
+        let originalImage = null, mapThumbnail = new Image(); mapThumbnail.crossOrigin = 'Anonymous';
+        let map, marker, debounceTimeout;
+
+        function initMap() {
+            map = L.map('map').setView([20.5937, 78.9629], 4);
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
+            const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{y}/{x}', { attribution: '&copy; OpenStreetMap' });
+            const labelOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { attribution: '&copy; CARTO', pane: 'labels' });
+            satelliteLayer.addTo(map); labelOverlay.addTo(map);
+            const baseMaps = { "Satellite": satelliteLayer, "Streets": streetLayer };
+            const overlayMaps = { "Show Labels": labelOverlay };
+            L.control.layers(baseMaps, overlayMaps).addTo(map);
+            map.createPane('labels'); map.getPane('labels').style.zIndex = 650; map.getPane('labels').style.pointerEvents = 'none';
+            map.on('click', e => updateMarkerAndInputs(e.latlng.lat, e.latlng.lng));
+        }
+
+        function updateMarkerAndInputs(lat, lng, fromUserInput = false) {
+            allInputs.latitude.value = lat.toFixed(6); allInputs.longitude.value = lng.toFixed(6);
+            if (marker) { marker.setLatLng([lat, lng]); } else { marker = L.marker([lat, lng]).addTo(map); }
+            map.setView([lat, lng], 15);
+            clearTimeout(debounceTimeout);
+            const delay = fromUserInput ? 500 : 3000;
+            debounceTimeout = setTimeout(() => updateLocationDetails(lat, lng), delay);
+        }
+
+        async function updateLocationDetails(lat, lng) {
+            allInputs.plusCode.value = OpenLocationCode.encode(lat, lng);
+            allInputs.locationDetails.value = "Fetching address...";
+            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+            try {
+                const response = await fetch(url); const data = await response.json();
+                allInputs.locationDetails.value = (data?.display_name) || "Address not found.";
+            } catch (error) { allInputs.locationDetails.value = "Failed to fetch address."; }
+            generateLeafletThumbnail();
+        }
+
+        async function generateLeafletThumbnail() {
+            if (!originalImage) return;
+            try {
+                const mapEl = document.querySelector("#map");
+                const squareSize = Math.min(mapEl.clientWidth, mapEl.clientHeight);
+                const mapCanvas = await html2canvas(mapEl, {
+                    useCORS: true, width: squareSize, height: squareSize, scale: 1,
+                    ignoreElements: el => el.classList.contains('leaflet-control-container')
+                });
+                mapThumbnail.src = mapCanvas.toDataURL('image/jpeg', 0.9);
+            } catch (error) { console.error("html2canvas failed:", error); mapThumbnail.src = ''; redrawCanvas(); }
+        }
+        mapThumbnail.onload = redrawCanvas;
+        mapThumbnail.onerror = () => { console.error("Thumbnail failed to load."); redrawCanvas(); };
+
+        function handleManualCoordInput() {
+            const lat = parseFloat(allInputs.latitude.value); const lon = parseFloat(allInputs.longitude.value);
+            if (!isNaN(lat) && !isNaN(lon)) { updateMarkerAndInputs(lat, lon, true); }
+            else { alert("Please enter valid numbers for Latitude and Longitude."); }
+        }
+
+        function handlePlusCodeInput() {
+            const rawCode = allInputs.plusCode.value.trim(); if (!rawCode) return;
+            if (OpenLocationCode.isValid(rawCode) && OpenLocationCode.isFull(rawCode)) {
+                try {
+                    const decoded = OpenLocationCode.decode(rawCode);
+                    updateMarkerAndInputs(decoded.latitudeCenter, decoded.longitudeCenter, true); return;
+                } catch (e) { /* Fall through */ }
+            }
+            const mapCenter = map.getCenter();
+            if (OpenLocationCode.isShort(rawCode)) {
+                try {
+                    const recovered = OpenLocationCode.recoverNearest(rawCode, mapCenter.lat, mapCenter.lng);
+                    const decoded = OpenLocationCode.decode(recovered);
+                    allInputs.plusCode.value = recovered;
+                    updateMarkerAndInputs(decoded.latitudeCenter, decoded.longitudeCenter, true); return;
+                } catch (e) { /* Fall through */ }
+            }
+            alert("Invalid Plus Code. Please enter a valid full code (e.g., 7J4RVC8M+4V) or a short code (e.g., VC8M+4V) when the map is nearby.");
+        }
+        
+        window.addEventListener('DOMContentLoaded', () => { initMap(); loadTemplates(); });
+        allInputs.imageLoader.addEventListener('change', handleImageUpload);
+        allInputs.downloadBtn.addEventListener('click', downloadImage);
+        allInputs.locateBtn.addEventListener('click', () => navigator.geolocation.getCurrentPosition(pos => updateMarkerAndInputs(pos.coords.latitude, pos.coords.longitude, true)));
+        allInputs.searchBtn.addEventListener('click', async () => {
+            const query = allInputs.mapSearch.value; if (!query) return;
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
+            try {
+                const response = await fetch(url); const data = await response.json();
+                if (data.length > 0) updateMarkerAndInputs(parseFloat(data[0].lat), parseFloat(data[0].lon), true);
+                else alert('Location not found.');
+            } catch (e) { alert('Error searching for location.'); }
+        });
+        allInputs.retryThumbnailBtn.addEventListener('click', generateLeafletThumbnail);
+<<<<<<< HEAD
+        // --- MODIFICATION: Set click handlers for the new buttons ---
+=======
+>>>>>>> e693941 (updated the html to use js)
+        allInputs.coordGoBtn.addEventListener('click', handleManualCoordInput);
+        allInputs.plusCodeGoBtn.addEventListener('click', handlePlusCodeInput);
+        
+        [allInputs.locationName, allInputs.locationDetails, allInputs.date, allInputs.time, allInputs.timezone].forEach(input => {
+            input.addEventListener('input', redrawCanvas);
+        });
+        
+        function handleImageUpload(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                originalImage = new Image();
+                originalImage.onload = () => {
+                    allInputs.canvas.width = originalImage.width; allInputs.canvas.height = originalImage.height;
+                    allInputs.downloadBtn.disabled = false; allInputs.configFieldset.disabled = false; allInputs.retryThumbnailBtn.disabled = false;
+                    setCurrentDateTime();
+                    setTimeout(generateLeafletThumbnail, 100);
+                };
+                originalImage.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setCurrentDateTime() {
+            const now = new Date();
+            allInputs.date.value = now.toISOString().split('T')[0];
+            allInputs.time.value = now.toTimeString().split(' ')[0];
+            const offset = -now.getTimezoneOffset(); const sign = offset >= 0 ? '+' : '-';
+            const hours = Math.floor(Math.abs(offset) / 60).toString().padStart(2, '0');
+            const minutes = (Math.abs(offset) % 60).toString().padStart(2, '0');
+            allInputs.timezone.value = `GMT ${sign}${hours}:${minutes}`;
+        }
+
+        function redrawCanvas() {
+            if (!originalImage) return;
+            ctx.clearRect(0, 0, allInputs.canvas.width, allInputs.canvas.height);
+            ctx.drawImage(originalImage, 0, 0, allInputs.canvas.width, allInputs.canvas.height);
+            drawWatermark();
+        }
+
+        function drawWatermark() {
+            const baseWidth = allInputs.canvas.width; const margin = baseWidth * 0.02;
+            const boxHeight = baseWidth * 0.26; const boxWidth = baseWidth * 0.85;
+            const boxX = margin; const boxY = allInputs.canvas.height - boxHeight - margin;
+            const mapSize = boxHeight * 0.85; const mapX = boxX + (boxHeight - mapSize) / 2.5; const mapY = boxY + (boxHeight - mapSize) / 2;
+            const textStartX = mapX + mapSize + (boxHeight - mapSize) / 2;
+            const baseFontSize = baseWidth * 0.035;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+            if (mapThumbnail.complete && mapThumbnail.naturalWidth > 0) { ctx.drawImage(mapThumbnail, mapX, mapY, mapSize, mapSize); }
+
+            ctx.fillStyle = 'white'; ctx.textBaseline = 'top';
+            const lineHeight = baseFontSize * 1.15; let currentY = mapY;
+
+            ctx.font = `bold ${baseFontSize}px sans-serif`;
+            ctx.fillText(allInputs.locationName.value || 'Unnamed Location', textStartX, currentY); currentY += lineHeight * 1.2;
+
+            ctx.font = `normal ${baseFontSize * 0.75}px sans-serif`;
+            ctx.fillText(allInputs.plusCode.value || 'N/A', textStartX, currentY); currentY += lineHeight * 0.9;
+            
+            ctx.font = `normal ${baseFontSize * 0.7}px sans-serif`;
+            const address = allInputs.locationDetails.value || ''; const words = address.split(' ');
+            let currentLine = ''; let lineCount = 0;
+            for(let word of words) {
+                if(lineCount < 2 && ctx.measureText(currentLine + word).width > (boxWidth - mapSize - 40)) {
+                    ctx.fillText(currentLine.trim(), textStartX, currentY); currentY += lineHeight * 0.8;
+                    currentLine = word + ' '; lineCount++;
+                } else { currentLine += word + ' '; }
+            }
+            if (lineCount < 2) ctx.fillText(currentLine.trim(), textStartX, currentY);
+            currentY += lineHeight;
+
+            ctx.font = `normal ${baseFontSize * 0.75}px sans-serif`;
+            const lat = parseFloat(allInputs.latitude.value).toFixed(6) || '0'; const lon = parseFloat(allInputs.longitude.value).toFixed(6) || '0';
+            ctx.fillText(`Lat ${lat}° Long ${lon}°`, textStartX, currentY); currentY += lineHeight;
+
+            const formattedDate = allInputs.date.value.split('-').reverse().join('/');
+            ctx.fillText(`${formattedDate} ${allInputs.time.value || ''} ${allInputs.timezone.value || ''}`, textStartX, currentY);
+        }
+
+        function downloadImage() {
+            const dataUrl = allInputs.canvas.toDataURL('image/jpeg', 0.9);
+            const link = document.createElement('a'); link.download = 'watermarked-image.jpg'; link.href = dataUrl;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+<<<<<<< HEAD
+        async function loadTemplates() {
+            const templatesUrl = 'https://raw.githubusercontent.com/abnjo/gps-watermark-tool/main/templates.json';
+            try {
+                const response = await fetch(templatesUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const templates = await response.json();
+                if (templates.length === 0) throw new Error('Templates file is empty');
+                allInputs.templateButtons.innerHTML = '';
+                templates.forEach(template => {
+                    const button = document.createElement('button'); button.textContent = template.name;
+                    button.onclick = () => {
+                        allInputs.locationName.value = template.locationName || template.name;
+                        if (template.latitude && template.longitude) { updateMarkerAndInputs(template.latitude, template.longitude, true); }
+                    };
+                    allInputs.templateButtons.appendChild(button);
+                });
+            } catch (e) {
+                allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Could not load templates.</p>`;
+=======
+        // --- MODIFICATION: Rewritten to use the global templatesData variable ---
+        function loadTemplates() {
+            try {
+                if (typeof templatesData !== 'undefined' && templatesData.length > 0) {
+                    allInputs.templateButtons.innerHTML = ''; 
+                    templatesData.forEach(template => {
+                        const button = document.createElement('button'); button.textContent = template.name;
+                        button.onclick = () => {
+                            allInputs.locationName.value = template.locationName || template.name;
+                            if (template.latitude && template.longitude) { updateMarkerAndInputs(template.latitude, template.longitude, true); }
+                        };
+                        allInputs.templateButtons.appendChild(button);
+                    });
+                } else {
+                    throw new Error('templatesData variable is not defined or is empty.');
+                }
+            } catch (e) {
+                allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Could not load templates. Ensure templates.js is present.</p>`;
+>>>>>>> e693941 (updated the html to use js)
+                console.error("Template loading error:", e);
+            }
+        }
+    </script>
+</body>
+</html>
