@@ -9,13 +9,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/open-location-code@2.0.0/openlocationcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<<<<<<< HEAD
-=======
     
     <!-- MODIFICATION: Load the templates data from the JS file -->
     <script src="templates.js"></script>
 
->>>>>>> e693941 (updated the html to use js)
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -202,10 +199,6 @@
             } catch (e) { alert('Error searching for location.'); }
         });
         allInputs.retryThumbnailBtn.addEventListener('click', generateLeafletThumbnail);
-<<<<<<< HEAD
-        // --- MODIFICATION: Set click handlers for the new buttons ---
-=======
->>>>>>> e693941 (updated the html to use js)
         allInputs.coordGoBtn.addEventListener('click', handleManualCoordInput);
         allInputs.plusCodeGoBtn.addEventListener('click', handlePlusCodeInput);
         
@@ -292,26 +285,6 @@
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
-<<<<<<< HEAD
-        async function loadTemplates() {
-            const templatesUrl = 'https://raw.githubusercontent.com/abnjo/gps-watermark-tool/main/templates.json';
-            try {
-                const response = await fetch(templatesUrl);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const templates = await response.json();
-                if (templates.length === 0) throw new Error('Templates file is empty');
-                allInputs.templateButtons.innerHTML = '';
-                templates.forEach(template => {
-                    const button = document.createElement('button'); button.textContent = template.name;
-                    button.onclick = () => {
-                        allInputs.locationName.value = template.locationName || template.name;
-                        if (template.latitude && template.longitude) { updateMarkerAndInputs(template.latitude, template.longitude, true); }
-                    };
-                    allInputs.templateButtons.appendChild(button);
-                });
-            } catch (e) {
-                allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Could not load templates.</p>`;
-=======
         // --- MODIFICATION: Rewritten to use the global templatesData variable ---
         function loadTemplates() {
             try {
@@ -330,7 +303,6 @@
                 }
             } catch (e) {
                 allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Could not load templates. Ensure templates.js is present.</p>`;
->>>>>>> e693941 (updated the html to use js)
                 console.error("Template loading error:", e);
             }
         }
