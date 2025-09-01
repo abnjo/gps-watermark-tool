@@ -1,0 +1,29 @@
+[
+  {
+    "name": "Main Construction Site",
+    "locationName": "123 Builder's Avenue",
+    "code1": "PROJ-A-001",
+    "code2": "SITE-A-XYZ",
+    "latitude": 40.7128,
+    "longitude": -74.0060,
+    "timezone": "GMT -04:00"
+  },
+  {
+    "name": "North Field Office",
+    "locationName": "North Field Trailer",
+    "code1": "PROJ-B-002",
+    "code2": "SITE-B-ABC",
+    "latitude": 34.0522,
+    "longitude": -118.2437,
+    "timezone": "GMT -07:00"
+  },
+  {
+    "name": "Warehouse Depot",
+    "locationName": "Storage Unit #5",
+    "code1": "WH-005",
+    "code2": "DEPOT-C-JKL",
+    "latitude": 41.8781,
+    "longitude": -87.6298,
+    "timezone": "GMT -05:00"
+  }
+]```
