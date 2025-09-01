@@ -104,32 +104,14 @@
 
         function initMap() {
             map = L.map('map').setView([20.5937, 78.9629], 4);
-            
-            // --- MODIFICATION: Define multiple map layers ---
-            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: 'Tiles &copy; Esri'
-            });
-            const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap'
-            });
-            const labelOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; CARTO', pane: 'labels'
-            });
-
-            // Set default layers
-            satelliteLayer.addTo(map);
-            labelOverlay.addTo(map);
-
-            // Create layer control
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
+            const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{y}/{x}', { attribution: '&copy; OpenStreetMap' });
+            const labelOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { attribution: '&copy; CARTO', pane: 'labels' });
+            satelliteLayer.addTo(map); labelOverlay.addTo(map);
             const baseMaps = { "Satellite": satelliteLayer, "Streets": streetLayer };
             const overlayMaps = { "Show Labels": labelOverlay };
             L.control.layers(baseMaps, overlayMaps).addTo(map);
-            
-            // Create a custom pane for labels to ensure they appear on top
-            map.createPane('labels');
-            map.getPane('labels').style.zIndex = 650;
-            map.getPane('labels').style.pointerEvents = 'none';
-
+            map.createPane('labels'); map.getPane('labels').style.zIndex = 650; map.getPane('labels').style.pointerEvents = 'none';
             map.on('click', e => updateMarkerAndInputs(e.latlng.lat, e.latlng.lng));
         }
 
@@ -138,7 +120,6 @@
             if (marker) { marker.setLatLng([lat, lng]); } else { marker = L.marker([lat, lng]).addTo(map); }
             map.setView([lat, lng], 15);
             clearTimeout(debounceTimeout);
-            // --- MODIFICATION: Increased delay to 3 seconds ---
             debounceTimeout = setTimeout(() => updateLocationDetails(lat, lng), 3000);
         }
 
@@ -285,13 +266,16 @@
         }
 
         async function loadTemplates() {
+            // --- MODIFICATION: Using the permanent raw GitHub URL ---
+            const templatesUrl = 'https://raw.githubusercontent.com/abnjo/gps-watermark-tool/d7435dad127f5138155ba7e95bea54086fd13baf/templates.json';
+            
             try {
-                const response = await fetch('templates.json');
-                if (!response.ok) throw new Error('File not found');
+                const response = await fetch(templatesUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
                 const templates = await response.json();
                 if (templates.length === 0) throw new Error('Templates file is empty');
 
-                allInputs.templateButtons.innerHTML = ''; // Clear any previous message
+                allInputs.templateButtons.innerHTML = ''; 
                 templates.forEach(template => {
                     const button = document.createElement('button'); button.textContent = template.name;
                     button.onclick = () => {
@@ -301,8 +285,8 @@
                     allInputs.templateButtons.appendChild(button);
                 });
             } catch (e) {
-                // --- MODIFICATION: Show a helpful message if templates fail to load ---
-                allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">No templates found. Ensure templates.json is in the same directory.</p>`;
+                allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Could not load templates. Check the URL or network connection.</p>`;
+                console.error("Template loading error:", e);
             }
         }
     </script>
