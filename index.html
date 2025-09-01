@@ -10,8 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/open-location-code@2.0.0/openlocationcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
-    <!-- MODIFICATION: Load the templates data from the JS file -->
-    <script src="templates.js"></script>
+    <!-- We will now load templates.js on demand, not automatically here -->
 
     <style>
         body {
@@ -39,7 +38,7 @@
         button:hover, input[type="file"]::file-selector-button:hover { background-color: #166fe5; }
         button:disabled { background-color: #a0bdf5; cursor: not-allowed; }
         #previewCanvas { max-width: 100%; height: auto; border: 1px solid #dddfe2; border-radius: 6px; }
-        #map { height: 250px; width: 100%; border-radius: 6px; margin-bottom: 15px; background-color: #e0e0e0; }
+        #map { height: 250px; width: 100%; border-radius: 6px; margin-bottom: 15px; background-color: #e0e-0e0; }
         .template-buttons button, #retryThumbnailBtn {
             background-color: #e4e6eb; color: #1c1e21; margin-top: 5px; font-size: 14px;
         }
@@ -113,14 +112,13 @@
 
         function initMap() {
             map = L.map('map').setView([20.5937, 78.9629], 4);
+            map.createPane('labels'); map.getPane('labels').style.zIndex = 650; map.getPane('labels').style.pointerEvents = 'none';
             const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
             const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{y}/{x}', { attribution: '&copy; OpenStreetMap' });
             const labelOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { attribution: '&copy; CARTO', pane: 'labels' });
             satelliteLayer.addTo(map); labelOverlay.addTo(map);
-            const baseMaps = { "Satellite": satelliteLayer, "Streets": streetLayer };
-            const overlayMaps = { "Show Labels": labelOverlay };
+            const baseMaps = { "Satellite": satelliteLayer, "Streets": streetLayer }; const overlayMaps = { "Show Labels": labelOverlay };
             L.control.layers(baseMaps, overlayMaps).addTo(map);
-            map.createPane('labels'); map.getPane('labels').style.zIndex = 650; map.getPane('labels').style.pointerEvents = 'none';
             map.on('click', e => updateMarkerAndInputs(e.latlng.lat, e.latlng.lng));
         }
 
@@ -285,7 +283,7 @@
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
-        // --- MODIFICATION: Rewritten to use the global templatesData variable ---
+        // --- MODIFICATION: Rewritten to support a manual "Load/Retry" button ---
         function loadTemplates() {
             try {
                 if (typeof templatesData !== 'undefined' && templatesData.length > 0) {
@@ -299,12 +297,41 @@
                         allInputs.templateButtons.appendChild(button);
                     });
                 } else {
-                    throw new Error('templatesData variable is not defined or is empty.');
+                    throw new Error('templatesData variable is not defined.');
                 }
             } catch (e) {
-                allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Could not load templates. Ensure templates.js is present.</p>`;
-                console.error("Template loading error:", e);
+                allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Presets not loaded. <button id="loadTemplatesBtn" type="button" style="margin:0; padding: 2px 4px; font-size: 12px; width: auto;">Load/Retry Templates</button></p>`;
+                document.getElementById('loadTemplatesBtn').addEventListener('click', fetchTemplates);
             }
+        }
+
+        function fetchTemplates() {
+            // Remove any old script tag to ensure a fresh request
+            const oldScript = document.getElementById('templates-script');
+            if (oldScript) {
+                oldScript.remove();
+            }
+
+            allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Loading...</p>`;
+            
+            const script = document.createElement('script');
+            script.id = 'templates-script';
+            script.src = 'templates.js'; // The relative path to your JS file
+            
+            // If the script loads successfully, re-run the loadTemplates function
+            script.onload = () => {
+                console.log("templates.js loaded successfully.");
+                loadTemplates();
+            };
+
+            // If it fails (e.g., 404 Not Found), show an error and the button again
+            script.onerror = () => {
+                console.error("Failed to load templates.js.");
+                allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Failed. <button id="loadTemplatesBtn" type="button" style="margin:0; padding: 2px 4px; font-size: 12px; width: auto;">Try Again</button></p>`;
+                document.getElementById('loadTemplatesBtn').addEventListener('click', fetchTemplates);
+            };
+
+            document.head.appendChild(script);
         }
     </script>
 </body>
