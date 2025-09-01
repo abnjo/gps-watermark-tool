@@ -27,7 +27,7 @@
             width: 100%; padding: 8px; border: 1px solid #dddfe2; border-radius: 6px;
             box-sizing: border-box; font-family: inherit;
         }
-        .input-pair { display: flex; gap: 10px; }
+        .input-pair { display: flex; gap: 10px; align-items: center; }
         button, input[type="file"]::file-selector-button {
             width: 100%; padding: 10px 15px; border-radius: 6px; border: none; background-color: #1877f2;
             color: white; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background-color 0.2s;
@@ -50,10 +50,7 @@
     <div class="container">
         <div class="controls">
             <h2>Configuration</h2>
-            <div class="input-group">
-                <label for="imageLoader">1. Choose Photo</label>
-                <input type="file" id="imageLoader" accept="image/*">
-            </div>
+            <div class="input-group"><label for="imageLoader">1. Choose Photo</label><input type="file" id="imageLoader" accept="image/*"></div>
 
             <fieldset id="config-fieldset" disabled>
                 <legend>2. Configure Watermark</legend>
@@ -68,9 +65,16 @@
                     <div id="map"></div>
                     <div class="input-pair">
                         <input type="number" step="any" id="latitude" placeholder="Latitude"><input type="number" step="any" id="longitude" placeholder="Longitude">
+                        <button type="button" id="coordGoBtn" style="width: auto; margin-top: 0; padding: 8px 12px; font-size: 14px;">Go</button>
                     </div>
                 </div>
-                <div class="input-group"><label for="plusCode">Plus Code</label><input type="text" id="plusCode" placeholder="Auto-generates or enter a code"></div>
+                <div class="input-group">
+                    <label for="plusCode">Plus Code</label>
+                    <div class="input-pair">
+                        <input type="text" id="plusCode" placeholder="Auto-generates or enter a code">
+                        <button type="button" id="plusCodeGoBtn" style="width: auto; margin-top: 0; padding: 8px 12px; font-size: 14px;">Go</button>
+                    </div>
+                </div>
                 <div class="input-group"><label for="locationDetails">Location Details (Auto-Generated)</label><textarea id="locationDetails" rows="3" placeholder="Auto-generated from map"></textarea></div>
                 <div class="input-group"><label>Date & Time</label><div class="input-pair"><input type="date" id="date"><input type="time" id="time" step="1"></div></div>
                 <div class="input-group"><label for="timezone">Timezone</label><input type="text" id="timezone" placeholder="e.g., GMT +05:30"></div>
@@ -97,6 +101,7 @@
             locateBtn: document.getElementById('locateBtn'), searchBtn: document.getElementById('searchBtn'),
             mapSearch: document.getElementById('mapSearch'), retryThumbnailBtn: document.getElementById('retryThumbnailBtn'),
             templateButtons: document.getElementById('template-buttons'),
+            coordGoBtn: document.getElementById('coordGoBtn'), plusCodeGoBtn: document.getElementById('plusCodeGoBtn'),
         };
         const ctx = allInputs.canvas.getContext('2d');
         let originalImage = null, mapThumbnail = new Image(); mapThumbnail.crossOrigin = 'Anonymous';
@@ -115,12 +120,13 @@
             map.on('click', e => updateMarkerAndInputs(e.latlng.lat, e.latlng.lng));
         }
 
-        function updateMarkerAndInputs(lat, lng) {
+        function updateMarkerAndInputs(lat, lng, fromUserInput = false) {
             allInputs.latitude.value = lat.toFixed(6); allInputs.longitude.value = lng.toFixed(6);
             if (marker) { marker.setLatLng([lat, lng]); } else { marker = L.marker([lat, lng]).addTo(map); }
             map.setView([lat, lng], 15);
             clearTimeout(debounceTimeout);
-            debounceTimeout = setTimeout(() => updateLocationDetails(lat, lng), 3000);
+            const delay = fromUserInput ? 500 : 3000;
+            debounceTimeout = setTimeout(() => updateLocationDetails(lat, lng), delay);
         }
 
         async function updateLocationDetails(lat, lng) {
@@ -151,36 +157,47 @@
 
         function handleManualCoordInput() {
             const lat = parseFloat(allInputs.latitude.value); const lon = parseFloat(allInputs.longitude.value);
-            if (!isNaN(lat) && !isNaN(lon)) { updateMarkerAndInputs(lat, lon); }
+            if (!isNaN(lat) && !isNaN(lon)) { updateMarkerAndInputs(lat, lon, true); }
+            else { alert("Please enter valid numbers for Latitude and Longitude."); }
         }
 
         function handlePlusCodeInput() {
-            const code = allInputs.plusCode.value;
-            if (OpenLocationCode.isValid(code)) {
+            const rawCode = allInputs.plusCode.value.trim(); if (!rawCode) return;
+            if (OpenLocationCode.isValid(rawCode) && OpenLocationCode.isFull(rawCode)) {
                 try {
-                    const decoded = OpenLocationCode.decode(code);
-                    updateMarkerAndInputs(decoded.latitudeCenter, decoded.longitudeCenter);
-                } catch (e) { console.error("Invalid Plus Code:", e); }
+                    const decoded = OpenLocationCode.decode(rawCode);
+                    updateMarkerAndInputs(decoded.latitudeCenter, decoded.longitudeCenter, true); return;
+                } catch (e) { /* Fall through */ }
             }
+            const mapCenter = map.getCenter();
+            if (OpenLocationCode.isShort(rawCode)) {
+                try {
+                    const recovered = OpenLocationCode.recoverNearest(rawCode, mapCenter.lat, mapCenter.lng);
+                    const decoded = OpenLocationCode.decode(recovered);
+                    allInputs.plusCode.value = recovered;
+                    updateMarkerAndInputs(decoded.latitudeCenter, decoded.longitudeCenter, true); return;
+                } catch (e) { /* Fall through */ }
+            }
+            alert("Invalid Plus Code. Please enter a valid full code (e.g., 7J4RVC8M+4V) or a short code (e.g., VC8M+4V) when the map is nearby.");
         }
         
         window.addEventListener('DOMContentLoaded', () => { initMap(); loadTemplates(); });
         allInputs.imageLoader.addEventListener('change', handleImageUpload);
         allInputs.downloadBtn.addEventListener('click', downloadImage);
-        allInputs.locateBtn.addEventListener('click', () => navigator.geolocation.getCurrentPosition(pos => updateMarkerAndInputs(pos.coords.latitude, pos.coords.longitude)));
+        allInputs.locateBtn.addEventListener('click', () => navigator.geolocation.getCurrentPosition(pos => updateMarkerAndInputs(pos.coords.latitude, pos.coords.longitude, true)));
         allInputs.searchBtn.addEventListener('click', async () => {
             const query = allInputs.mapSearch.value; if (!query) return;
             const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
             try {
                 const response = await fetch(url); const data = await response.json();
-                if (data.length > 0) updateMarkerAndInputs(parseFloat(data[0].lat), parseFloat(data[0].lon));
+                if (data.length > 0) updateMarkerAndInputs(parseFloat(data[0].lat), parseFloat(data[0].lon), true);
                 else alert('Location not found.');
             } catch (e) { alert('Error searching for location.'); }
         });
         allInputs.retryThumbnailBtn.addEventListener('click', generateLeafletThumbnail);
-        allInputs.latitude.addEventListener('change', handleManualCoordInput);
-        allInputs.longitude.addEventListener('change', handleManualCoordInput);
-        allInputs.plusCode.addEventListener('change', handlePlusCodeInput);
+        // --- MODIFICATION: Set click handlers for the new buttons ---
+        allInputs.coordGoBtn.addEventListener('click', handleManualCoordInput);
+        allInputs.plusCodeGoBtn.addEventListener('click', handlePlusCodeInput);
         
         [allInputs.locationName, allInputs.locationDetails, allInputs.date, allInputs.time, allInputs.timezone].forEach(input => {
             input.addEventListener('input', redrawCanvas);
@@ -266,26 +283,23 @@
         }
 
         async function loadTemplates() {
-            // --- MODIFICATION: Using the permanent raw GitHub URL ---
-            const templatesUrl = 'https://raw.githubusercontent.com/abnjo/gps-watermark-tool/d7435dad127f5138155ba7e95bea54086fd13baf/templates.json';
-            
+            const templatesUrl = 'https://raw.githubusercontent.com/abnjo/gps-watermark-tool/main/templates.json';
             try {
                 const response = await fetch(templatesUrl);
                 if (!response.ok) throw new Error('Network response was not ok');
                 const templates = await response.json();
                 if (templates.length === 0) throw new Error('Templates file is empty');
-
-                allInputs.templateButtons.innerHTML = ''; 
+                allInputs.templateButtons.innerHTML = '';
                 templates.forEach(template => {
                     const button = document.createElement('button'); button.textContent = template.name;
                     button.onclick = () => {
                         allInputs.locationName.value = template.locationName || template.name;
-                        if (template.latitude && template.longitude) { updateMarkerAndInputs(template.latitude, template.longitude); }
+                        if (template.latitude && template.longitude) { updateMarkerAndInputs(template.latitude, template.longitude, true); }
                     };
                     allInputs.templateButtons.appendChild(button);
                 });
             } catch (e) {
-                allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Could not load templates. Check the URL or network connection.</p>`;
+                allInputs.templateButtons.innerHTML = `<p style="font-size: 12px; color: #666; margin: 0;">Could not load templates.</p>`;
                 console.error("Template loading error:", e);
             }
         }
